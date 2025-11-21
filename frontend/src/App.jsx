@@ -16,7 +16,9 @@ import {
   DollarSign,
   FileText,
   Menu,
-  X
+  X,
+  Receipt,
+  ArrowLeft
 } from 'lucide-react';
 
 // --- CONFIGURATION & THEME ---
@@ -36,15 +38,9 @@ const THEME = {
 };
 
 // --- C++ BACKEND CONNECTION SIMULATION ---
-/*
- * This section simulates the API calls that would connect to the 
- * C++ InventoryController class we created.
- */
 const BackendAPI = {
-  // Simulates: InventoryController::getInventory()
   fetchInventory: async () => {
     console.log("Connecting to C++ Backend: Calling getInventory()...");
-    // Added delay to simulate real C++ server latency
     await new Promise(resolve => setTimeout(resolve, 500)); 
     return [
       { id: 1, name: 'Pastel Notebook', price: 12.50, stock: 45, category: 'Stationery' },
@@ -55,7 +51,6 @@ const BackendAPI = {
     ];
   },
 
-  // Simulates: InventoryController::setStockUpdate(id, qty)
   updateStock: async (id, qty) => {
     console.log(`Connecting to C++ Backend: Calling setStockUpdate(${id}, ${qty})...`);
     return { success: true, message: "Stock Updated in C++ Memory" };
@@ -64,10 +59,9 @@ const BackendAPI = {
 
 // --- COMPONENTS ---
 
-const Button = ({ children, variant = 'primary', onClick, className = '', icon: Icon }) => {
-  const baseStyle = "px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 shadow-sm active:scale-95";
+const Button = ({ children, variant = 'primary', onClick, className = '', icon: Icon, disabled }) => {
+  const baseStyle = "px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed";
   
-  // We use inline styles for specific theme colors to ensure they match exactly
   const styleMap = {
     primary: { backgroundColor: THEME.colors.primary, color: 'white' },
     secondary: { backgroundColor: THEME.colors.secondary, color: THEME.colors.textPrimary },
@@ -79,6 +73,7 @@ const Button = ({ children, variant = 'primary', onClick, className = '', icon: 
   return (
     <button 
       onClick={onClick} 
+      disabled={disabled}
       className={`${baseStyle} ${className} ${variant === 'ghost' ? 'hover:bg-gray-100' : ''}`}
       style={variant !== 'ghost' ? styleMap[variant] : {}}
     >
@@ -240,6 +235,93 @@ const Dashboard = ({ inventory, salesHistory }) => {
   );
 };
 
+// BILLS VIEWER (NEW COMPONENT)
+const BillsViewer = ({ salesHistory }) => {
+  const [selectedBill, setSelectedBill] = useState(null);
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+        <FileText className="text-[#7e2fed]" /> Bill History
+      </h2>
+      
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Bill List */}
+        <div className={`${selectedBill ? 'hidden lg:block lg:w-1/2' : 'w-full'} bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden`}>
+          <table className="w-full text-left">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="p-4 text-sm font-semibold text-gray-600">Bill ID</th>
+                <th className="p-4 text-sm font-semibold text-gray-600">Date</th>
+                <th className="p-4 text-sm font-semibold text-gray-600">Total</th>
+                <th className="p-4 text-sm font-semibold text-gray-600">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {salesHistory.map(bill => (
+                <tr key={bill.id} className="hover:bg-purple-50/50 transition-colors">
+                  <td className="p-4 font-medium text-gray-700">#{bill.id}</td>
+                  <td className="p-4 text-gray-500 text-sm">{new Date(bill.date).toLocaleDateString()}</td>
+                  <td className="p-4 font-bold text-[#7e2fed]">${bill.total.toFixed(2)}</td>
+                  <td className="p-4">
+                    <button 
+                      onClick={() => setSelectedBill(bill)}
+                      className="px-3 py-1 bg-purple-100 text-[#7e2fed] rounded-lg text-sm font-medium hover:bg-[#7e2fed] hover:text-white transition-all"
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {salesHistory.length === 0 && (
+            <div className="p-8 text-center text-gray-400">No bills generated yet.</div>
+          )}
+        </div>
+
+        {/* Bill Detail View */}
+        {selectedBill && (
+          <div className="w-full lg:w-1/2 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-lg border border-purple-100 p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5"><Receipt size={120} /></div>
+              <button onClick={() => setSelectedBill(null)} className="lg:hidden mb-4 flex items-center gap-2 text-gray-500"><ArrowLeft size={16}/> Back</button>
+              
+              <div className="border-b border-dashed border-gray-300 pb-4 mb-4">
+                <h3 className="text-xl font-bold text-gray-800">Invoice #{selectedBill.id}</h3>
+                <p className="text-sm text-gray-500">{new Date(selectedBill.date).toLocaleString()}</p>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                {selectedBill.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center">
+                    <div>
+                      <p className="font-medium text-gray-700">{item.name}</p>
+                      <p className="text-xs text-gray-400">${item.price} x {item.qty}</p>
+                    </div>
+                    <span className="font-medium text-gray-600">${(item.price * item.qty).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-dashed border-gray-300 pt-4">
+                <div className="flex justify-between text-lg font-bold text-gray-800">
+                  <span>Grand Total</span>
+                  <span className="text-[#7e2fed]">${selectedBill.total.toFixed(2)}</span>
+                </div>
+                <div className="mt-6 flex gap-2">
+                  <Button className="w-full justify-center" icon={CheckCircle}>Paid</Button>
+                  <Button variant="outline" className="w-full justify-center" icon={FileText} onClick={() => window.print()}>Print</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // INVENTORY MANAGER
 const InventoryManager = ({ inventory, setInventory, role }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -392,6 +474,7 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
   const [successMsg, setSuccessMsg] = useState(null);
+  const [billStage, setBillStage] = useState('cart'); // 'cart' | 'preview'
 
   const addToCart = (item) => {
     if (item.stock <= 0) return alert("Out of stock!");
@@ -429,9 +512,12 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
   const tax = subtotal * 0.10;
   const total = subtotal + tax;
 
-  const handleCheckout = async () => {
-    if (cart.length === 0) return;
-    
+  const handleCreateBill = () => {
+    if (cart.length === 0) return alert("Cart is empty!");
+    setBillStage('preview');
+  };
+
+  const handleProcessPayment = async () => {
     // 1. Call "C++" API to update stock
     for (const item of cart) {
       await BackendAPI.updateStock(item.id, item.qty);
@@ -455,6 +541,7 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
     });
 
     setCart([]);
+    setBillStage('cart');
     setSuccessMsg("Payment Successful! Invoice Generated.");
     setTimeout(() => setSuccessMsg(null), 3000);
   };
@@ -463,8 +550,8 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-140px)]">
-      {/* Product Grid */}
-      <div className="flex-1 overflow-y-auto pr-2">
+      {/* LEFT: Product Grid (Only show in Cart Mode) */}
+      <div className={`flex-1 overflow-y-auto pr-2 ${billStage === 'preview' ? 'hidden lg:block lg:opacity-50 lg:pointer-events-none' : ''}`}>
         <div className="mb-4 sticky top-0 bg-[#FDFDFD] z-10 py-2">
            <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -498,10 +585,13 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
         </div>
       </div>
 
-      {/* Cart */}
-      <div className="w-full lg:w-96 flex flex-col bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+      {/* RIGHT: Cart / Bill Preview */}
+      <div className="w-full lg:w-96 flex flex-col bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden transition-all duration-300">
         <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="font-bold text-gray-700 flex items-center gap-2"><ShoppingCart size={18}/> Current Order</h3>
+          <h3 className="font-bold text-gray-700 flex items-center gap-2">
+            {billStage === 'preview' ? <Receipt size={18}/> : <ShoppingCart size={18}/>} 
+            {billStage === 'preview' ? 'Bill Summary' : 'Current Order'}
+          </h3>
           <span className="text-xs bg-white px-2 py-1 rounded border border-gray-200">#{Math.floor(Math.random() * 10000)}</span>
         </div>
         
@@ -518,12 +608,16 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
                   <h5 className="font-medium text-gray-700 text-sm">{item.name}</h5>
                   <p className="text-xs text-gray-400">${item.price} x {item.qty}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center">-</button>
-                  <span className="text-sm font-bold w-4 text-center">{item.qty}</span>
-                  <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center">+</button>
-                  <button onClick={() => removeFromCart(item.id)} className="ml-2 text-red-300 hover:text-red-500"><Trash2 size={14}/></button>
-                </div>
+                {billStage === 'cart' ? (
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center">-</button>
+                    <span className="text-sm font-bold w-4 text-center">{item.qty}</span>
+                    <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center">+</button>
+                    <button onClick={() => removeFromCart(item.id)} className="ml-2 text-red-300 hover:text-red-500"><Trash2 size={14}/></button>
+                  </div>
+                ) : (
+                  <span className="font-bold text-gray-700">${(item.price * item.qty).toFixed(2)}</span>
+                )}
               </div>
             ))
           )}
@@ -534,9 +628,24 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
           <div className="flex justify-between text-sm text-gray-500"><span>Tax (10%)</span><span>${tax.toFixed(2)}</span></div>
           <div className="flex justify-between text-lg font-bold text-gray-800 pt-2 border-t border-gray-200"><span>Total</span><span>${total.toFixed(2)}</span></div>
           
-          <Button onClick={handleCheckout} variant="primary" className="w-full justify-center py-3 mt-4 shadow-lg shadow-pink-200">
-             {successMsg ? <CheckCircle /> : 'Process Payment'}
-          </Button>
+          {billStage === 'cart' ? (
+            <Button onClick={handleCreateBill} variant="primary" className="w-full justify-center py-3 mt-4 shadow-lg shadow-pink-200" disabled={cart.length === 0}>
+               Create Bill
+            </Button>
+          ) : (
+            <div className="space-y-2 mt-4">
+              <div className="bg-yellow-50 border border-yellow-200 p-2 rounded-lg text-xs text-yellow-700 mb-2">
+                ⚠️ Please confirm items before processing payment.
+              </div>
+              <Button onClick={handleProcessPayment} variant="primary" className="w-full justify-center py-3 shadow-lg shadow-pink-200">
+                 Process Payment
+              </Button>
+              <Button onClick={() => setBillStage('cart')} variant="ghost" className="w-full justify-center">
+                 Back to Edit
+              </Button>
+            </div>
+          )}
+          
           {successMsg && <p className="text-center text-xs text-green-600 font-medium animate-pulse">{successMsg}</p>}
         </div>
       </div>
@@ -550,8 +659,8 @@ export default function App() {
   const [view, setView] = useState('dashboard');
   const [inventory, setInventory] = useState([]);
   const [salesHistory, setSalesHistory] = useState([
-    { id: 101, total: 120.50, date: '2023-10-01' },
-    { id: 102, total: 45.00, date: '2023-10-02' }
+    { id: 101, total: 120.50, date: '2023-10-01', items: [{name: 'Notebook', price: 12.5, qty: 10}] },
+    { id: 102, total: 45.00, date: '2023-10-02', items: [{name: 'Gel Pen', price: 8, qty: 5}] }
   ]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -579,8 +688,9 @@ export default function App() {
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager'] },
       { id: 'inventory', label: 'Inventory', icon: Package, roles: ['admin', 'manager', 'cashier'] },
       { id: 'billing', label: 'Billing & POS', icon: ShoppingCart, roles: ['admin', 'cashier'] },
+      { id: 'bills', label: 'View Bills', icon: FileText, roles: ['admin', 'manager', 'cashier'] }, // Added Bills section
       { id: 'users', label: 'Staff', icon: Users, roles: ['admin'] },
-      { id: 'reports', label: 'Reports', icon: FileText, roles: ['admin', 'manager'] },
+      { id: 'reports', label: 'Reports', icon: TrendingUp, roles: ['admin', 'manager'] },
     ];
     return items.filter(item => item.roles.includes(userRole));
   }, [userRole]);
@@ -658,6 +768,7 @@ export default function App() {
           {view === 'dashboard' && <Dashboard inventory={inventory} salesHistory={salesHistory} />}
           {view === 'inventory' && <InventoryManager inventory={inventory} setInventory={setInventory} role={userRole} />}
           {view === 'billing' && <BillingSystem inventory={inventory} setInventory={setInventory} onCompleteSale={handleCompleteSale} />}
+          {view === 'bills' && <BillsViewer salesHistory={salesHistory} />}
           {view === 'users' && <div className="flex items-center justify-center h-full text-gray-400">Staff Management Module (Coming Soon)</div>}
           {view === 'reports' && <div className="flex items-center justify-center h-full text-gray-400">Advanced Reports Module (Coming Soon)</div>}
         </div>

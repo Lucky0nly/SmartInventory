@@ -7,8 +7,42 @@
 using namespace std;
 
 // ==========================================
-// 1. DATA MODEL (The "M" in MVC)
+// 1. DATA MODELS
 // ==========================================
+
+// Structure for items inside a bill
+struct BillItem {
+    string productName;
+    double price;
+    int qty;
+};
+
+// Class representing a Bill/Invoice
+class Bill {
+private:
+    int id;
+    double total;
+    string date;
+    vector<BillItem> items;
+
+public:
+    Bill(int b_id, double b_total, string b_date, vector<BillItem> b_items) {
+        id = b_id;
+        total = b_total;
+        date = b_date;
+        items = b_items;
+    }
+
+    void displayAsJSON() {
+        cout << "  { \"id\": " << id << ", \"total\": " << total << ", \"date\": \"" << date << "\", \"items\": [";
+        for (size_t i = 0; i < items.size(); i++) {
+            cout << "{\"name\": \"" << items[i].productName << "\", \"qty\": " << items[i].qty << "}";
+            if (i < items.size() - 1) cout << ", ";
+        }
+        cout << "] }" << endl;
+    }
+};
+
 class Product {
 private:
     int id;
@@ -26,20 +60,15 @@ public:
         category = p_cat;
     }
 
-    // --- GETTERS (for API responses) ---
     int getId() const { return id; }
     string getName() const { return name; }
     double getPrice() const { return price; }
     int getStock() const { return stock; }
-    string getCategory() const { return category; }
-
-    // --- SETTERS (for API updates) ---
+    
     void setStock(int qty) { stock = qty; }
-    void setPrice(double p) { price = p; }
 
-    // --- DISPLAY (JSON Simulation) ---
     void displayAsJSON() {
-        cout << "{ \"id\": " << id << ", \"name\": \"" << name << "\", \"price\": " << price 
+        cout << "  { \"id\": " << id << ", \"name\": \"" << name << "\", \"price\": " << price 
              << ", \"stock\": " << stock << " }" << endl;
     }
 };
@@ -50,16 +79,23 @@ public:
 class InventoryService {
 private:
     vector<Product> products;
+    vector<Bill> salesHistory; // Stores all past bills
 
 public:
     void seedData() {
         products.push_back(Product(1, "Pastel Notebook", 12.50, 45, "Stationery"));
         products.push_back(Product(2, "Gel Pen Set", 8.00, 12, "Stationery"));
         products.push_back(Product(3, "Desk Lamp", 35.00, 8, "Electronics"));
+        products.push_back(Product(4, "Ceramic Mug", 15.00, 24, "Home"));
+        products.push_back(Product(5, "Planner 2025", 22.00, 5, "Stationery"));
     }
 
     vector<Product>& getAllProducts() {
         return products;
+    }
+
+    vector<Bill>& getSalesHistory() {
+        return salesHistory;
     }
 
     Product* getProductById(int id) {
@@ -69,25 +105,24 @@ public:
         return nullptr;
     }
 
-    void addProduct(Product p) {
-        products.push_back(p);
+    void addBill(Bill b) {
+        salesHistory.push_back(b);
     }
 };
 
 // ==========================================
-// 3. MAIN CLASS: INVENTORY CONTROLLER 
-// (The "API" that connects to Frontend)
+// 3. CONTROLLER (API Simulation)
 // ==========================================
 class InventoryController {
 private:
-    InventoryService* service; // Pointer to logic layer
+    InventoryService* service;
 
 public:
     InventoryController(InventoryService* s) : service(s) {}
 
-    // --- GET METHOD (Connected to GET /api/inventory) ---
+    // GET /api/inventory
     void getInventory() {
-        cout << "\n[API RESPONSE] Sending Inventory Data to Frontend..." << endl;
+        cout << "\n[API RESPONSE] JSON Data:" << endl;
         cout << "[" << endl;
         vector<Product>& list = service->getAllProducts();
         for (size_t i = 0; i < list.size(); i++) {
@@ -97,70 +132,82 @@ public:
         cout << "]" << endl;
     }
 
-    // --- SET METHOD (Connected to POST /api/buy) ---
-    void setStockUpdate(int id, int qtyBought) {
-        cout << "\n[API REQUEST] Received Update Request for ID: " << id << endl;
-        Product* p = service->getProductById(id);
-        
-        if (p != nullptr) {
-            if (p->getStock() >= qtyBought) {
-                int newStock = p->getStock() - qtyBought;
-                p->setStock(newStock);
-                cout << "[API SUCCESS] Stock updated. New Stock: " << newStock << endl;
-            } else {
-                cout << "[API ERROR] Insufficient Stock." << endl;
-            }
-        } else {
-            cout << "[API ERROR] Product not found." << endl;
+    // GET /api/bills (New Endpoint)
+    void getBills() {
+        cout << "\n[API RESPONSE] Sales History JSON:" << endl;
+        cout << "[" << endl;
+        vector<Bill>& list = service->getSalesHistory();
+        for (size_t i = 0; i < list.size(); i++) {
+            list[i].displayAsJSON();
+            if (i < list.size() - 1) cout << "," << endl;
         }
+        cout << "]" << endl;
     }
 
-    // --- DISPLAY METHOD (Connected to Dashboard View) ---
-    void displayDashboardStats() {
-        vector<Product>& list = service->getAllProducts();
-        double totalValue = 0;
-        int lowStockCount = 0;
+    // POST /api/pay (Simulated Payment Process)
+    // Takes bill ID, total amount, and a vector of pairs {Product ID, Quantity}
+    void processPayment(int billId, double total, vector<pair<int, int>> cartItems) {
+        cout << "\n[API REQUEST] Processing Payment for Bill #" << billId << "..." << endl;
+        
+        vector<BillItem> billItems;
+        bool stockError = false;
 
-        for (auto &p : list) {
-            totalValue += (p.getPrice() * p.getStock());
-            if (p.getStock() < 10) lowStockCount++;
+        // 1. Check and Update Stock
+        for (auto item : cartItems) {
+            int pId = item.first;
+            int qty = item.second;
+            
+            Product* p = service->getProductById(pId);
+            if (p && p->getStock() >= qty) {
+                p->setStock(p->getStock() - qty);
+                // Add to bill record
+                billItems.push_back({p->getName(), p->getPrice(), qty});
+            } else {
+                stockError = true;
+                cout << "[API ERROR] Stock mismatch for Product ID: " << pId << endl;
+            }
         }
 
-        cout << "\n[API RESPONSE] Dashboard Stats:" << endl;
-        cout << "{ \"total_value\": " << totalValue << ", \"low_stock_alerts\": " << lowStockCount << " }" << endl;
+        // 2. Save Bill if no errors
+        if (!stockError) {
+            // In a real app, date would be auto-generated
+            Bill newBill(billId, total, "2023-11-21", billItems);
+            service->addBill(newBill);
+            cout << "[API SUCCESS] Payment Processed. Bill Saved." << endl;
+        } else {
+            cout << "[API FAILED] Transaction cancelled due to stock issues." << endl;
+        }
     }
 };
 
 // ==========================================
-// MAIN EXECUTION
+// MAIN
 // ==========================================
 int main() {
-    // 1. Initialize System
     InventoryService service;
     service.seedData();
-
-    // 2. Initialize Controller (The interface)
     InventoryController api(&service);
 
-    cout << "=== C++ BACKEND SERVER RUNNING ===" << endl;
-    cout << "Waiting for Frontend Requests...\n" << endl;
-
-    // 3. Simulate Frontend Interactions
+    cout << "=== C++ BACKEND SERVER (UPDATED) ===" << endl;
     
-    // SCENARIO 1: Frontend loads Dashboard
-    // Frontend calls: GET /api/dashboard
-    cout << ">>> REQUEST: Frontend asks for Dashboard Stats" << endl;
-    api.displayDashboardStats();
-
-    // SCENARIO 2: Frontend loads Inventory Table
-    // Frontend calls: GET /api/inventory
-    cout << "\n>>> REQUEST: Frontend asks for Product List" << endl;
+    // Simulate User Journey
+    
+    // 1. Load Inventory
     api.getInventory();
 
-    // SCENARIO 3: User buys 2 Notebooks (ID 1)
-    // Frontend calls: POST /api/buy { id: 1, qty: 2 }
-    cout << "\n>>> REQUEST: Frontend sends Buy Order (ID: 1, Qty: 2)" << endl;
-    api.setStockUpdate(1, 2);
+    // 2. User creates a bill (ID 1001) with 2 items
+    // Buying: ID 1 (2 qty), ID 3 (1 qty)
+    vector<pair<int, int>> cart = {{1, 2}, {3, 1}};
+    api.processPayment(1001, 60.00, cart);
+
+    // 3. User creates another bill (ID 1002)
+    // Buying: ID 2 (5 qty)
+    vector<pair<int, int>> cart2 = {{2, 5}};
+    api.processPayment(1002, 40.00, cart2);
+
+    // 4. Admin views bill history (The "View Bills" page)
+    cout << "\n>>> ADMIN REQUEST: View Bill History" << endl;
+    api.getBills();
 
     return 0;
 }
