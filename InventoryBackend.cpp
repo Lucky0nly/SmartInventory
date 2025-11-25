@@ -7,23 +7,69 @@
 using namespace std;
 
 // ==========================================
-// 1. DATA MODELS
+// [NEW] 0. USER HIERARCHY (OOP: Inheritance & Polymorphism)
 // ==========================================
 
-// Structure for items inside a bill
+// Base Class
+class User {
+protected:
+    string username;
+public:
+    User(string u) : username(u) {}
+
+    // Virtual Function (Polymorphism)
+    virtual void showRole() {
+        cout << "User: " << username << " (Generic Role)" << endl;
+    }
+
+    // Virtual Function to check permissions
+    virtual bool canViewReports() {
+        return false; // Default: No access
+    }
+};
+
+// Derived Class 1 (Inheritance)
+class Admin : public User {
+public:
+    Admin(string u) : User(u) {}
+
+    // Overriding Base Method
+    void showRole() override {
+        cout << "User: " << username << " [ADMIN] - Full Access granted." << endl;
+    }
+
+    bool canViewReports() override {
+        return true; // Admins can view reports
+    }
+};
+
+// Derived Class 2 (Inheritance)
+class Cashier : public User {
+public:
+    Cashier(string u) : User(u) {}
+
+    // Overriding Base Method
+    void showRole() override {
+        cout << "User: " << username << " [CASHIER] - Limited Access (Billing Only)." << endl;
+    }
+};
+
+// ==========================================
+// 1. DATA MODELS (OOP: Encapsulation & Composition)
+// ==========================================
+
 struct BillItem {
     string productName;
     double price;
     int qty;
 };
 
-// Class representing a Bill/Invoice
 class Bill {
 private:
     int id;
     double total;
     string date;
-    vector<BillItem> items;
+    vector<BillItem> items; // Composition
 
 public:
     Bill(int b_id, double b_total, string b_date, vector<BillItem> b_items) {
@@ -74,12 +120,12 @@ public:
 };
 
 // ==========================================
-// 2. SERVICE LAYER (Business Logic)
+// 2. SERVICE LAYER (OOP: Abstraction)
 // ==========================================
 class InventoryService {
 private:
     vector<Product> products;
-    vector<Bill> salesHistory; // Stores all past bills
+    vector<Bill> salesHistory;
 
 public:
     void seedData() {
@@ -88,6 +134,9 @@ public:
         products.push_back(Product(3, "Desk Lamp", 35.00, 8, "Electronics"));
         products.push_back(Product(4, "Ceramic Mug", 15.00, 24, "Home"));
         products.push_back(Product(5, "Planner 2025", 22.00, 5, "Stationery"));
+        // Added new items for Cloths and Food
+        products.push_back(Product(6, "Cotton T-Shirt", 18.00, 30, "Cloths"));
+        products.push_back(Product(7, "Energy Bar", 3.50, 60, "Food"));
     }
 
     vector<Product>& getAllProducts() {
@@ -111,7 +160,7 @@ public:
 };
 
 // ==========================================
-// 3. CONTROLLER (API Simulation)
+// 3. CONTROLLER
 // ==========================================
 class InventoryController {
 private:
@@ -120,7 +169,6 @@ private:
 public:
     InventoryController(InventoryService* s) : service(s) {}
 
-    // GET /api/inventory
     void getInventory() {
         cout << "\n[API RESPONSE] JSON Data:" << endl;
         cout << "[" << endl;
@@ -132,7 +180,6 @@ public:
         cout << "]" << endl;
     }
 
-    // GET /api/bills (New Endpoint)
     void getBills() {
         cout << "\n[API RESPONSE] Sales History JSON:" << endl;
         cout << "[" << endl;
@@ -144,15 +191,12 @@ public:
         cout << "]" << endl;
     }
 
-    // POST /api/pay (Simulated Payment Process)
-    // Takes bill ID, total amount, and a vector of pairs {Product ID, Quantity}
     void processPayment(int billId, double total, vector<pair<int, int>> cartItems) {
         cout << "\n[API REQUEST] Processing Payment for Bill #" << billId << "..." << endl;
         
         vector<BillItem> billItems;
         bool stockError = false;
 
-        // 1. Check and Update Stock
         for (auto item : cartItems) {
             int pId = item.first;
             int qty = item.second;
@@ -160,7 +204,6 @@ public:
             Product* p = service->getProductById(pId);
             if (p && p->getStock() >= qty) {
                 p->setStock(p->getStock() - qty);
-                // Add to bill record
                 billItems.push_back({p->getName(), p->getPrice(), qty});
             } else {
                 stockError = true;
@@ -168,9 +211,7 @@ public:
             }
         }
 
-        // 2. Save Bill if no errors
         if (!stockError) {
-            // In a real app, date would be auto-generated
             Bill newBill(billId, total, "2023-11-21", billItems);
             service->addBill(newBill);
             cout << "[API SUCCESS] Payment Processed. Bill Saved." << endl;
@@ -181,33 +222,50 @@ public:
 };
 
 // ==========================================
-// MAIN
+// MAIN EXECUTION
 // ==========================================
 int main() {
     InventoryService service;
     service.seedData();
     InventoryController api(&service);
 
-    cout << "=== C++ BACKEND SERVER (UPDATED) ===" << endl;
+    cout << "=== C++ BACKEND SERVER (OOP: POLYMORPHISM ENABLED) ===" << endl;
     
-    // Simulate User Journey
+    // 1. Demonstration of Polymorphism
+    // Using Base Class Pointer to hold Derived Class Objects
+    User* currentUser;
     
-    // 1. Load Inventory
-    api.getInventory();
+    // Scenario A: Admin Login
+    currentUser = new Admin("Lucky");
+    currentUser->showRole(); // Calls Admin's showRole() -> POLYMORPHISM
+    
+    api.getInventory(); // Anyone can view inventory
 
-    // 2. User creates a bill (ID 1001) with 2 items
-    // Buying: ID 1 (2 qty), ID 3 (1 qty)
+    // Scenario B: Cashier Login (Simulated)
+    delete currentUser;
+    currentUser = new Cashier("Bob");
+    currentUser->showRole(); // Calls Cashier's showRole() -> POLYMORPHISM
+
+    // 2. Process Transactions
     vector<pair<int, int>> cart = {{1, 2}, {3, 1}};
     api.processPayment(1001, 60.00, cart);
 
-    // 3. User creates another bill (ID 1002)
-    // Buying: ID 2 (5 qty)
-    vector<pair<int, int>> cart2 = {{2, 5}};
-    api.processPayment(1002, 40.00, cart2);
+    // 3. Check Permissions using Inheritance/Polymorphism logic
+    cout << "\n>>> CHECKING PERMISSIONS FOR CURRENT USER (" << "Bob" << ")..." << endl;
+    if (currentUser->canViewReports()) {
+        api.getBills();
+    } else {
+        cout << "[ACCESS DENIED] Current user cannot view global bill history." << endl;
+    }
 
-    // 4. Admin views bill history (The "View Bills" page)
-    cout << "\n>>> ADMIN REQUEST: View Bill History" << endl;
-    api.getBills();
+    // 4. Switch back to Admin to view reports
+    delete currentUser;
+    currentUser = new Admin("SuperAdmin");
+    cout << "\n>>> SWITCHED USER: SuperAdmin" << endl;
+    if (currentUser->canViewReports()) {
+        cout << ">>> ADMIN REQUEST: View Bill History" << endl;
+        api.getBills();
+    }
 
     return 0;
 }

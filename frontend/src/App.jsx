@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
 import { 
   LayoutDashboard, 
   Package, 
@@ -18,8 +18,131 @@ import {
   Menu,
   X,
   Receipt,
-  ArrowLeft
+  ArrowLeft,
+  Calendar,
+  Languages
 } from 'lucide-react';
+
+// --- 1. INTERNAL TRANSLATION SYSTEM (Updated with Chinese & Arabic) ---
+
+const translations = {
+  en: {
+    "welcome": "Welcome Back!",
+    "subtitle": "SIMBAT Inventory System",
+    "select_role": "Select Role to Demo:",
+    "dashboard": "Dashboard",
+    "inventory": "Inventory",
+    "billing": "Billing & POS",
+    "bills": "Bill History",
+    "staff": "Staff",
+    "reports": "Reports",
+    "total_revenue": "Total Revenue",
+    "total_products": "Total Products",
+    "low_stock_alerts": "Low Stock Alerts",
+    "sales_overview": "Sales Overview",
+    "items_restock": "Items need restocking",
+    "stock_left": "left",
+    "create_bill": "Create Bill",
+    "process_payment": "Process Payment",
+    "grand_total": "Grand Total",
+    "action_needed": "Action Needed",
+    "search_placeholder": "Scan barcode or search item..."
+  },
+  zh: {
+    "welcome": "欢迎回来！",
+    "subtitle": "SIMBAT 库存系统",
+    "select_role": "选择演示角色：",
+    "dashboard": "仪表板",
+    "inventory": "库存",
+    "billing": "账单和POS",
+    "bills": "账单历史",
+    "staff": "员工",
+    "reports": "报告",
+    "total_revenue": "总收入",
+    "total_products": "产品总数",
+    "low_stock_alerts": "低库存警报",
+    "sales_overview": "销售概览",
+    "items_restock": "物品需要补货",
+    "stock_left": "剩余",
+    "create_bill": "创建账单",
+    "process_payment": "处理付款",
+    "grand_total": "总计",
+    "action_needed": "需要采取行动",
+    "search_placeholder": "扫描条形码或搜索物品..."
+  },
+  ar: {
+    "welcome": "مرحبًا بعودتك!",
+    "subtitle": "نظام جرد SIMBAT",
+    "select_role": "اختر دورًا للعرض التوضيحي:",
+    "dashboard": "لوحة القيادة",
+    "inventory": "المخزون",
+    "billing": "الفواتير ونقاط البيع",
+    "bills": "سجل الفواتير",
+    "staff": "الموظفين",
+    "reports": "التقارير",
+    "total_revenue": "إجمالي الإيرادات",
+    "total_products": "إجمالي المنتجات",
+    "low_stock_alerts": "تنبيهات انخفاض المخزون",
+    "sales_overview": "نظرة عامة على المبيعات",
+    "items_restock": "عناصر تحتاج إلى إعادة تخزين",
+    "stock_left": "المتبقي",
+    "create_bill": "إنشاء فاتورة",
+    "process_payment": "معالجة الدفع",
+    "grand_total": "المجموع الإجمالي",
+    "action_needed": "الإجراء مطلوب",
+    "search_placeholder": "مسح الباركود أو البحث عن عنصر..."
+  },
+  jp: {
+    "welcome": "おかえりなさい！",
+    "subtitle": "SIMBAT 在庫システム",
+    "select_role": "デモの役割を選択:",
+    "dashboard": "ダッシュボード",
+    "inventory": "在庫",
+    "billing": "会計 & POS",
+    "bills": "請求履歴",
+    "staff": "スタッフ",
+    "reports": "レポート",
+    "total_revenue": "総収益",
+    "total_products": "総製品数",
+    "low_stock_alerts": "在庫不足アラート",
+    "sales_overview": "売上概要",
+    "items_restock": "補充が必要です",
+    "stock_left": "残り",
+    "create_bill": "請求書作成",
+    "process_payment": "支払処理",
+    "grand_total": "総計",
+    "action_needed": "要対応",
+    "search_placeholder": "バーコードスキャンまたは検索..."
+  }
+};
+
+// Create Context
+const LanguageContext = createContext();
+
+// Language Provider Component
+const LanguageProvider = ({ children }) => {
+  const [language, setLanguage] = useState('en');
+
+  const t = (key) => {
+    return translations[language][key] || key;
+  };
+
+  const changeLanguage = (lang) => {
+    setLanguage(lang);
+    // Basic RTL support for Arabic
+    document.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  };
+
+  return (
+    <LanguageContext.Provider value={{ t, changeLanguage, language }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+};
+
+// Custom Hook to use translation
+const useTranslation = () => useContext(LanguageContext);
+
 
 // --- CONFIGURATION & THEME ---
 const THEME = {
@@ -48,6 +171,9 @@ const BackendAPI = {
       { id: 3, name: 'Desk Lamp', price: 35.00, stock: 8, category: 'Electronics' },
       { id: 4, name: 'Ceramic Mug', price: 15.00, stock: 24, category: 'Home' },
       { id: 5, name: 'Planner 2025', price: 22.00, stock: 5, category: 'Stationery' },
+      // New items matching C++ Backend
+      { id: 6, name: 'Cotton T-Shirt', price: 18.00, stock: 30, category: 'Cloths' },
+      { id: 7, name: 'Energy Bar', price: 3.50, stock: 60, category: 'Food' },
     ];
   },
 
@@ -83,13 +209,18 @@ const Button = ({ children, variant = 'primary', onClick, className = '', icon: 
   );
 };
 
-const Card = ({ children, className = '', title, highlight }) => (
+const Card = ({ children, className = '', title, highlight, action }) => (
   <div className={`bg-white rounded-2xl p-6 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] border border-gray-50 ${className}`}>
-    {title && (
-      <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center justify-between">
-        {title}
-        {highlight && <span className="text-xs px-2 py-1 rounded-full bg-[#FDE68A] text-gray-700">{highlight}</span>}
-      </h3>
+    {(title || action) && (
+      <div className="flex items-center justify-between mb-4">
+        {title && (
+          <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
+            {title}
+            {highlight && <span className="text-xs px-2 py-1 rounded-full bg-[#FDE68A] text-gray-700 ml-2">{highlight}</span>}
+          </h3>
+        )}
+        {action}
+      </div>
     )}
     {children}
   </div>
@@ -115,22 +246,33 @@ const Badge = ({ type, children }) => {
 
 // LOGIN SCREEN
 const LoginScreen = ({ onLogin }) => {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 relative overflow-hidden">
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 rounded-full bg-[#A8D5E3] opacity-20 blur-3xl"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 rounded-full bg-[#7e2fed] opacity-20 blur-3xl"></div>
 
       <Card className="w-full max-w-md z-10 backdrop-blur-sm bg-white/90">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto bg-[#7e2fed] rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-purple-200">
-            <Package size={32} className="text-white" />
+        <div className="text-center mb-10">
+          <div className="w-24 h-24 mx-auto bg-white rounded-2xl flex items-center justify-center mb-6 relative overflow-hidden shadow-sm border border-gray-100">
+             <img 
+               src="/logo.png" 
+               alt="SIMBAT Logo" 
+               className="w-full h-full object-contain"
+               onError={(e) => {
+                 e.target.onerror = null; 
+                 e.target.src = "https://cdn-icons-png.flaticon.com/512/3753/3753024.png" 
+               }}
+             />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Welcome Back!</h1>
-          <p className="text-gray-500">Smart Inventory System</p>
+          
+          <h1 className="text-5xl font-extrabold text-black tracking-tight">SIMBAT</h1>
+          <p className="text-gray-500 mt-2">{t('welcome')}</p>
         </div>
 
         <div className="space-y-4">
-          <p className="text-sm font-medium text-gray-600 mb-2">Select Role to Demo:</p>
+          <p className="text-sm font-medium text-gray-600 mb-2">{t('select_role')}</p>
           <div className="grid grid-cols-1 gap-3">
             <button onClick={() => onLogin('admin')} className="p-4 rounded-xl border border-gray-200 hover:border-[#7e2fed] hover:bg-purple-50 transition-all flex items-center gap-3 group">
               <div className="p-2 bg-purple-100 rounded-lg text-[#7e2fed] group-hover:bg-[#7e2fed] group-hover:text-white transition-colors"><Settings size={20} /></div>
@@ -162,23 +304,76 @@ const LoginScreen = ({ onLogin }) => {
 
 // DASHBOARD
 const Dashboard = ({ inventory, salesHistory }) => {
+  const { t } = useTranslation();
   const totalRevenue = salesHistory.reduce((acc, curr) => acc + curr.total, 0);
   const lowStockItems = inventory.filter(i => i.stock < 10);
   
+  const [salesDuration, setSalesDuration] = useState('Weekly');
+
+  const chartData = useMemo(() => {
+    if (salesDuration === 'Weekly') {
+      const last7Days = [...Array(7)].map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        return d;
+      });
+
+      const labels = last7Days.map(d => d.toLocaleDateString('en-US', { weekday: 'short' }));
+      
+      const data = last7Days.map(day => {
+        const dayStr = day.toDateString();
+        return salesHistory
+          .filter(sale => new Date(sale.date).toDateString() === dayStr)
+          .reduce((sum, sale) => sum + sale.total, 0);
+      });
+
+      return { labels, data };
+    }
+
+    switch(salesDuration) {
+      case 'Daily':
+        return {
+          data: [15, 25, 20, 35, 30, 45, 40],
+          labels: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00']
+        };
+      case 'Monthly':
+        return {
+          data: [200, 450, 300, 600, 550, 700, 800],
+          labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 1', 'Wk 2', 'Wk 3']
+        };
+      case 'Yearly':
+        return {
+          data: [1200, 1900, 1500, 2200, 2800, 2400, 3100],
+          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul']
+        };
+      default:
+        return { data: [], labels: [] };
+    }
+  }, [salesDuration, salesHistory]);
+
   const Chart = () => (
-    <div className="flex items-end gap-2 h-32 mt-4">
-      {[40, 70, 45, 90, 60, 85, 50].map((h, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer">
-           <div 
-             className="w-full rounded-t-lg transition-all duration-500 group-hover:opacity-80 relative"
-             style={{ height: `${h}%`, backgroundColor: i % 2 === 0 ? THEME.colors.primary : THEME.colors.secondary }}
-           >
-              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                ${h * 10}
-              </div>
-           </div>
-        </div>
-      ))}
+    <div className="flex items-end gap-2 h-40 mt-8 mb-2">
+      {chartData.data.map((h, i) => {
+        const max = Math.max(...chartData.data, 1); 
+        const heightPercentage = (h / max) * 100;
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer">
+             <div 
+               className="w-full rounded-t-lg transition-all duration-500 hover:opacity-80 relative bg-blue-100"
+               style={{ 
+                 height: `${heightPercentage || 5}%`, 
+                 backgroundColor: h > 0 ? (i % 2 === 0 ? THEME.colors.primary : THEME.colors.secondary) : '#E5E7EB' 
+               }}
+             >
+                {h > 0 && (
+                  <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-gray-500 text-xs font-bold">
+                    ${h.toFixed(0)}
+                  </div>
+                )}
+             </div>
+          </div>
+        );
+      })}
     </div>
   );
 
@@ -187,33 +382,54 @@ const Dashboard = ({ inventory, salesHistory }) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="relative overflow-hidden">
           <div className="absolute right-0 top-0 p-4 opacity-10"><DollarSign size={100} /></div>
-          <p className="text-gray-500 text-sm">Total Revenue</p>
+          <p className="text-gray-500 text-sm">{t('total_revenue')}</p>
           <h2 className="text-3xl font-bold text-gray-800 mt-2">${totalRevenue.toFixed(2)}</h2>
           <Badge type="success" className="mt-2 inline-block">+12.5% from last week</Badge>
         </Card>
         <Card className="relative overflow-hidden">
           <div className="absolute right-0 top-0 p-4 opacity-10"><Package size={100} /></div>
-          <p className="text-gray-500 text-sm">Total Products</p>
+          <p className="text-gray-500 text-sm">{t('total_products')}</p>
           <h2 className="text-3xl font-bold text-gray-800 mt-2">{inventory.length}</h2>
           <span className="text-xs text-gray-400">Active Inventory</span>
         </Card>
         <Card className="relative overflow-hidden">
           <div className="absolute right-0 top-0 p-4 opacity-10"><AlertCircle size={100} /></div>
-          <p className="text-gray-500 text-sm">Low Stock Alerts</p>
+          <p className="text-gray-500 text-sm">{t('low_stock_alerts')}</p>
           <h2 className="text-3xl font-bold text-[#EF4444] mt-2">{lowStockItems.length}</h2>
-          <span className="text-xs text-gray-400">Items need restocking</span>
+          <span className="text-xs text-gray-400">{t('items_restock')}</span>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Weekly Sales Overview">
+        <Card 
+          title={`${salesDuration} ${t('sales_overview')}`}
+          action={
+            <div className="relative">
+              <select 
+                value={salesDuration}
+                onChange={(e) => setSalesDuration(e.target.value)}
+                className="appearance-none bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-[#7e2fed] focus:border-[#7e2fed] block w-full p-2 pr-8 cursor-pointer outline-none"
+              >
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+                <option value="Yearly">Yearly</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <Calendar size={14} />
+              </div>
+            </div>
+          }
+        >
           <Chart />
           <div className="flex justify-between mt-4 text-xs text-gray-400">
-            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            {chartData.labels.map((label, i) => (
+              <span key={i}>{label}</span>
+            ))}
           </div>
         </Card>
 
-        <Card title="Low Stock Items" highlight="Action Needed">
+        <Card title={t('low_stock_alerts')} highlight={t('action_needed')}>
           <div className="space-y-3">
             {lowStockItems.length === 0 ? (
               <p className="text-gray-500 italic text-sm">All stocked up! 🎉</p>
@@ -224,7 +440,7 @@ const Dashboard = ({ inventory, salesHistory }) => {
                     <div className="w-2 h-2 rounded-full bg-red-500"></div>
                     <span className="font-medium text-gray-700">{item.name}</span>
                   </div>
-                  <span className="text-red-600 font-bold text-sm">{item.stock} left</span>
+                  <span className="text-red-600 font-bold text-sm">{item.stock} {t('stock_left')}</span>
                 </div>
               ))
             )}
@@ -235,14 +451,15 @@ const Dashboard = ({ inventory, salesHistory }) => {
   );
 };
 
-// BILLS VIEWER (NEW COMPONENT)
+// BILLS VIEWER
 const BillsViewer = ({ salesHistory }) => {
+  const { t } = useTranslation();
   const [selectedBill, setSelectedBill] = useState(null);
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-        <FileText className="text-[#7e2fed]" /> Bill History
+        <FileText className="text-[#7e2fed]" /> {t('bills')}
       </h2>
       
       <div className="flex flex-col lg:flex-row gap-6">
@@ -306,7 +523,7 @@ const BillsViewer = ({ salesHistory }) => {
 
               <div className="border-t border-dashed border-gray-300 pt-4">
                 <div className="flex justify-between text-lg font-bold text-gray-800">
-                  <span>Grand Total</span>
+                  <span>{t('grand_total')}</span>
                   <span className="text-[#7e2fed]">${selectedBill.total.toFixed(2)}</span>
                 </div>
                 <div className="mt-6 flex gap-2">
@@ -324,6 +541,7 @@ const BillsViewer = ({ salesHistory }) => {
 
 // INVENTORY MANAGER
 const InventoryManager = ({ inventory, setInventory, role }) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentItem, setCurrentItem] = useState({ name: '', price: '', stock: '', category: '' });
@@ -335,7 +553,6 @@ const InventoryManager = ({ inventory, setInventory, role }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Here we would call BackendAPI.updateStock or addProduct
     if (isEditing) {
       setInventory(prev => prev.map(i => i.id === currentItem.id ? { ...currentItem, price: parseFloat(currentItem.price), stock: parseInt(currentItem.stock) } : i));
     } else {
@@ -370,7 +587,7 @@ const InventoryManager = ({ inventory, setInventory, role }) => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input 
             type="text" 
-            placeholder="Search inventory..." 
+            placeholder={t('search_placeholder')}
             className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#7e2fed]/50 transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -405,7 +622,7 @@ const InventoryManager = ({ inventory, setInventory, role }) => {
                   <td className="p-4 text-gray-600">{item.stock}</td>
                   <td className="p-4">
                     {item.stock < 10 
-                      ? <Badge type="danger">Low Stock</Badge>
+                      ? <Badge type="danger">{t('items_restock')}</Badge>
                       : <Badge type="success">In Stock</Badge>
                     }
                   </td>
@@ -456,6 +673,8 @@ const InventoryManager = ({ inventory, setInventory, role }) => {
                   <option value="Stationery">Stationery</option>
                   <option value="Electronics">Electronics</option>
                   <option value="Home">Home</option>
+                  <option value="Cloths">Cloths</option>
+                  <option value="Food">Food</option>
                 </select>
               </div>
               <div className="pt-4">
@@ -471,6 +690,7 @@ const InventoryManager = ({ inventory, setInventory, role }) => {
 
 // BILLING SYSTEM
 const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
+  const { t } = useTranslation();
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
   const [successMsg, setSuccessMsg] = useState(null);
@@ -557,7 +777,7 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input 
               type="text" 
-              placeholder="Scan barcode or search item..." 
+              placeholder={t('search_placeholder')}
               className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A8D5E3]"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -578,7 +798,7 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
               <h4 className="font-bold text-gray-700 truncate">{item.name}</h4>
               <div className="flex justify-between items-center mt-2">
                 <span className="text-[#7e2fed] font-bold">${item.price}</span>
-                <span className="text-xs text-gray-400">{item.stock} left</span>
+                <span className="text-xs text-gray-400">{item.stock} {t('stock_left')}</span>
               </div>
             </div>
           ))}
@@ -630,7 +850,7 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
           
           {billStage === 'cart' ? (
             <Button onClick={handleCreateBill} variant="primary" className="w-full justify-center py-3 mt-4 shadow-lg shadow-pink-200" disabled={cart.length === 0}>
-               Create Bill
+               {t('create_bill')}
             </Button>
           ) : (
             <div className="space-y-2 mt-4">
@@ -638,7 +858,7 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
                 ⚠️ Please confirm items before processing payment.
               </div>
               <Button onClick={handleProcessPayment} variant="primary" className="w-full justify-center py-3 shadow-lg shadow-pink-200">
-                 Process Payment
+                 {t('process_payment')}
               </Button>
               <Button onClick={() => setBillStage('cart')} variant="ghost" className="w-full justify-center">
                  Back to Edit
@@ -653,14 +873,25 @@ const BillingSystem = ({ inventory, setInventory, onCompleteSale }) => {
   );
 };
 
+// WRAPPER FOR PREVIEW
+const AppWrapper = () => {
+  return (
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
+  );
+};
+
 // MAIN APP
-export default function App() {
+const App = () => {
+  const { t, changeLanguage, language } = useTranslation();
   const [userRole, setUserRole] = useState(null);
   const [view, setView] = useState('dashboard');
   const [inventory, setInventory] = useState([]);
   const [salesHistory, setSalesHistory] = useState([
-    { id: 101, total: 120.50, date: '2023-10-01', items: [{name: 'Notebook', price: 12.5, qty: 10}] },
-    { id: 102, total: 45.00, date: '2023-10-02', items: [{name: 'Gel Pen', price: 8, qty: 5}] }
+    // DYNAMIC INITIAL DATES: These will now show up on the chart as "Today" and "Yesterday"
+    { id: 101, total: 120.50, date: new Date().toISOString(), items: [{name: 'Notebook', price: 12.5, qty: 10}] },
+    { id: 102, total: 45.00, date: new Date(Date.now() - 86400000).toISOString(), items: [{name: 'Gel Pen', price: 8, qty: 5}] }
   ]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -685,15 +916,15 @@ export default function App() {
 
   const navItems = useMemo(() => {
     const items = [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager'] },
-      { id: 'inventory', label: 'Inventory', icon: Package, roles: ['admin', 'manager', 'cashier'] },
-      { id: 'billing', label: 'Billing & POS', icon: ShoppingCart, roles: ['admin', 'cashier'] },
-      { id: 'bills', label: 'View Bills', icon: FileText, roles: ['admin', 'manager', 'cashier'] }, // Added Bills section
-      { id: 'users', label: 'Staff', icon: Users, roles: ['admin'] },
-      { id: 'reports', label: 'Reports', icon: TrendingUp, roles: ['admin', 'manager'] },
+      { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard, roles: ['admin', 'manager'] },
+      { id: 'inventory', label: t('inventory'), icon: Package, roles: ['admin', 'manager', 'cashier'] },
+      { id: 'billing', label: t('billing'), icon: ShoppingCart, roles: ['admin', 'cashier'] },
+      { id: 'bills', label: t('bills'), icon: FileText, roles: ['admin', 'manager', 'cashier'] }, // Added Bills section
+      { id: 'users', label: t('staff'), icon: Users, roles: ['admin'] },
+      { id: 'reports', label: t('reports'), icon: TrendingUp, roles: ['admin', 'manager'] },
     ];
     return items.filter(item => item.roles.includes(userRole));
-  }, [userRole]);
+  }, [userRole, t]);
 
   if (!userRole) {
     return <LoginScreen onLogin={handleLogin} />;
@@ -707,10 +938,16 @@ export default function App() {
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static
       `}>
         <div className="h-20 flex items-center px-8 border-b border-gray-50">
-           <div className="w-8 h-8 bg-[#7e2fed] rounded-lg flex items-center justify-center mr-3">
-             <span className="text-white font-bold">S</span>
+           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center mr-3 relative overflow-hidden border border-gray-100 shadow-sm">
+             {/* CUSTOM LOGO */}
+             <img 
+               src="/logo.png" 
+               alt="Logo" 
+               className="w-full h-full object-contain"
+               onError={(e) => { e.target.onerror = null; e.target.src = "https://cdn-icons-png.flaticon.com/512/3753/3753024.png" }}
+             />
            </div>
-           <h1 className="text-xl font-bold bg-gradient-to-r from-[#7e2fed] to-[#A8D5E3] bg-clip-text text-transparent">SmartInv</h1>
+           <h1 className="text-xl font-bold bg-gradient-to-r from-[#7e2fed] to-[#A8D5E3] bg-clip-text text-transparent">SIMBAT</h1>
         </div>
 
         <div className="p-4 space-y-2">
@@ -731,6 +968,22 @@ export default function App() {
               {item.label}
             </button>
           ))}
+        </div>
+
+        <div className="p-4">
+          <div className="relative">
+            <select 
+              onChange={(e) => changeLanguage(e.target.value)}
+              className="w-full p-2 pl-8 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 text-sm appearance-none cursor-pointer"
+              defaultValue={language}
+            >
+              <option value="en">English</option>
+              <option value="zh">中文 (Chinese)</option>
+              <option value="ar">العربية (Arabic)</option>
+              <option value="jp">日本語 (Japanese)</option>
+            </select>
+            <Languages className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          </div>
         </div>
 
         <div className="absolute bottom-0 w-full p-4 border-t border-gray-50">
@@ -783,4 +1036,6 @@ export default function App() {
       )}
     </div>
   );
-}
+};
+
+export default AppWrapper;
