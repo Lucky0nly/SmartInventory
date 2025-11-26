@@ -6,16 +6,16 @@
 
 using namespace std;
 
-// ==========================================
+
 // [NEW] 0. USER HIERARCHY (OOP: Inheritance & Polymorphism)
-// ==========================================
+
 
 // Base Class
 class User {
 protected:
     string username;
 public:
-    User(string u) : username(u) {}
+    User(string u) : username(u) {}// When creating a User object, store the given string into the username variable.
 
     // Virtual Function (Polymorphism)
     virtual void showRole() {
@@ -81,7 +81,7 @@ public:
 
     void displayAsJSON() {
         cout << "  { \"id\": " << id << ", \"total\": " << total << ", \"date\": \"" << date << "\", \"items\": [";
-        for (size_t i = 0; i < items.size(); i++) {
+        for (size_t i = 0; i < items.size(); i++) {   // size_t = an unsigned integer type used for sizes and indexing.It is the standard type returned by vector.size()
             cout << "{\"name\": \"" << items[i].productName << "\", \"qty\": " << items[i].qty << "}";
             if (i < items.size() - 1) cout << ", ";
         }
@@ -124,17 +124,16 @@ public:
 // ==========================================
 class InventoryService {
 private:
-    vector<Product> products;
-    vector<Bill> salesHistory;
+    vector<Product> products;  //stores all product objects
+    vector<Bill> salesHistory; //stores all bills (sales invoices)
 
 public:
-    void seedData() {
+    void seedData() {   //Pre-load fake data
         products.push_back(Product(1, "Pastel Notebook", 12.50, 45, "Stationery"));
         products.push_back(Product(2, "Gel Pen Set", 8.00, 12, "Stationery"));
         products.push_back(Product(3, "Desk Lamp", 35.00, 8, "Electronics"));
         products.push_back(Product(4, "Ceramic Mug", 15.00, 24, "Home"));
         products.push_back(Product(5, "Planner 2025", 22.00, 5, "Stationery"));
-        // Added new items for Cloths and Food
         products.push_back(Product(6, "Cotton T-Shirt", 18.00, 30, "Cloths"));
         products.push_back(Product(7, "Energy Bar", 3.50, 60, "Food"));
     }
@@ -154,7 +153,7 @@ public:
         return nullptr;
     }
 
-    void addBill(Bill b) {
+    void addBill(Bill b) {  //Adds a bill object to sales history.
         salesHistory.push_back(b);
     }
 };
@@ -221,9 +220,9 @@ public:
     }
 };
 
-// ==========================================
+
 // MAIN EXECUTION
-// ==========================================
+
 int main() {
     InventoryService service;
     service.seedData();
